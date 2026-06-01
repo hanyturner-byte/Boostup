@@ -14,7 +14,9 @@ import {
   getDocs,
   serverTimestamp,
 } from "firebase/firestore";
-import { loadStripe } from "@stripe/js";
+import { loadStripe } from '@stripe/stripe-js';
+;
+
 
 // ── Firebase Config ──────────────────────────────────────────────────────────
 const firebaseConfig = {
