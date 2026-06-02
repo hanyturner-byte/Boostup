@@ -9,6 +9,10 @@ import {
   updateDoc,
   increment,
   serverTimestamp,
+  collection,
+  getDocs,
+  query,
+  where,
 } from "firebase/firestore";
 
 // ── Firebase Config ──────────────────────────────────────────────────────────
@@ -25,14 +29,19 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// ── Task pool ────────────────────────────────────────────────────────────────
-const TASK_POOL = [
-  { id: 1, type: "follow", platform: "tiktok", username: "adrianasousasss5", avatar: "https://i.pravatar.cc/150?img=47", reward: 5 },
-  { id: 2, type: "like", platform: "tiktok", username: "andretyson90", avatar: "https://i.pravatar.cc/150?img=12", reward: 3 },
-  { id: 3, type: "follow", platform: "instagram", username: "patrick.schmiedi", avatar: "https://i.pravatar.cc/150?img=33", reward: 5 },
-  { id: 4, type: "like", platform: "instagram", username: "xo.luna.xo", avatar: "https://i.pravatar.cc/150?img=25", reward: 3 },
-  { id: 5, type: "follow", platform: "tiktok", username: "danceking_jay", avatar: "https://i.pravatar.cc/150?img=56", reward: 5 },
-];
+// ── Initial task pool (hardcoded, platform-specific) ─────────────────────────
+const INITIAL_TASK_POOL = {
+  tiktok: [
+    { id: 1, type: "follow", platform: "tiktok", username: "mediroute", avatar: "https://i.pravatar.cc/150?img=1", reward: 5 },
+    { id: 2, type: "like", platform: "tiktok", username: "mediroute", avatar: "https://i.pravatar.cc/150?img=1", reward: 3 },
+  ],
+  instagram: [
+    { id: 3, type: "follow", platform: "instagram", username: "taker3800", avatar: "https://i.pravatar.cc/150?img=2", reward: 5 },
+    { id: 4, type: "like", platform: "instagram", username: "taker3800", avatar: "https://i.pravatar.cc/150?img=2", reward: 3 },
+    { id: 5, type: "follow", platform: "instagram", username: "goneaway", avatar: "https://i.pravatar.cc/150?img=3", reward: 5 },
+    { id: 6, type: "like", platform: "instagram", username: "goneaway", avatar: "https://i.pravatar.cc/150?img=3", reward: 3 },
+  ],
+};
 
 const STORE_ITEMS = {
   profile: [
@@ -58,11 +67,11 @@ const REPORT_REASONS = [
 ];
 
 const FAQ_DATA = [
-  { q: "How do I get started?", a: "Enter your TikTok or Instagram username to start earning coins by following or liking content. No password required." },
-  { q: "How can I earn coins?", a: "Complete tasks by following or liking accounts. You must wait 30 seconds before earning coins. Max 15 tasks per day." },
-  { q: "What's the mechanism?", a: "Your profile is promoted in our app. Users follow/like you and earn coins. You use coins to promote your own content." },
-  { q: "Is it secure?", a: "Yes. We never store passwords and direct you to the official app to follow/like." },
-  { q: "How long does my order take?", a: "2 minutes to 12 hours depending on order size." },
+  { q: "How do I get started?", a: "Choose your platform (TikTok or Instagram), enter your username, and start earning coins by following or liking accounts." },
+  { q: "How can I earn coins?", a: "Complete tasks by following or liking accounts on your chosen platform. Wait 30 seconds before earning coins. Max 15 tasks per day." },
+  { q: "How does it work?", a: "You earn coins by helping other creators. Once you buy followers/likes, your account is added to the task pool, so others help you in return!" },
+  { q: "Is it secure?", a: "Yes! We never store passwords. You're directed to the official app to follow/like." },
+  { q: "When do I get followers?", a: "2 minutes to 12 hours depending on order size." },
 ];
 
 // ── Main App ─────────────────────────────────────────────────────────────────
@@ -79,8 +88,13 @@ export default function App() {
   const [timerRunning, setTimerRunning] = useState(false);
   const [toast, setToast] = useState(null);
   const [coinAnim, setCoinAnim] = useState(false);
+  const [taskPool, setTaskPool] = useState([]);
   const toastRef = useRef(null);
   const timerRef = useRef(null);
+
+  // ── Onboarding state ──────────────────────────────────────────────────────
+  const [inputUser, setInputUser] = useState("");
+  const [selectedPlatform, setSelectedPlatform] = useState(null);
 
   // ── Auth & load user data ────────────────────────────────────────────────────
   useEffect(() => {
@@ -90,8 +104,10 @@ export default function App() {
         const userRef = doc(db, "users", fbUser.uid);
         const snap = await getDoc(userRef);
         if (snap.exists()) {
-          setUserData(snap.data());
+          const data = snap.data();
+          setUserData(data);
           setPage("home");
+          await loadTaskPool(data.platform);
         } else {
           setUserData({ coins: 0, orders: [], referrals: [] });
           setPage("onboard");
@@ -103,7 +119,28 @@ export default function App() {
     });
   }, []);
 
-  // ── Timer countdown ──────────────────────────────────────────────────────────
+  // ── Load task pool from Firestore + initial pool ──────────────────────────
+  async function loadTaskPool(platform) {
+    try {
+      const sellersRef = collection(db, "seller_profiles");
+      const q = query(sellersRef, where("platform", "==", platform));
+      const snap = await getDocs(q);
+      const firestoreTasks = snap.docs.map(doc => {
+        const data = doc.data();
+        return [
+          { id: data.username + "_follow", type: "follow", platform, username: data.username, avatar: data.avatar, reward: 5 },
+          { id: data.username + "_like", type: "like", platform, username: data.username, avatar: data.avatar, reward: 3 },
+        ];
+      }).flat();
+      
+      const combined = [...INITIAL_TASK_POOL[platform], ...firestoreTasks];
+      setTaskPool(combined);
+    } catch (e) {
+      setTaskPool(INITIAL_TASK_POOL[platform] || []);
+    }
+  }
+
+  // ── Timer countdown ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!timerRunning) return;
     timerRef.current = setInterval(() => {
@@ -131,17 +168,19 @@ export default function App() {
     updateDoc(doc(db, "users", user.uid), { coins: increment(amount) }).catch(() => {});
   }
 
-  // ── Onboarding ──────────────────────────────────────────────────────────────
-  const [inputUser, setInputUser] = useState("");
-
+  // ── Onboarding ──────────────────────────────────────────────────────────
   async function handleOnboard() {
-    if (!inputUser.trim()) return;
+    if (!inputUser.trim() || !selectedPlatform) {
+      showToast("Please fill all fields ❌", "error");
+      return;
+    }
     const cleanUser = inputUser.trim().replace("@", "");
     const uid = user.uid;
     const refCode = `REF${uid.slice(0, 8).toUpperCase()}`;
 
     const newUserData = {
       username: cleanUser,
+      platform: selectedPlatform,
       coins: 200,
       createdAt: serverTimestamp(),
       lastDailyReset: new Date().toDateString(),
@@ -149,20 +188,23 @@ export default function App() {
       referralCode: refCode,
       referredBy: null,
       referrals: [],
+      orders: [],
     };
 
     await setDoc(doc(db, "users", uid), newUserData);
     setUserData(newUserData);
+    await loadTaskPool(selectedPlatform);
     setPage("home");
     showToast("Welcome! 🎉");
   }
 
-  // ── Current task ────────────────────────────────────────────────────────────
+  // ── Current task ────────────────────────────────────────────────────────
   if (!userData) return loading ? <div style={styles.loading}>Loading...</div> : null;
 
-  const currentTask = TASK_POOL[Math.floor(Math.random() * TASK_POOL.length)];
+  const currentTask = taskPool.length > 0 ? taskPool[Math.floor(Math.random() * taskPool.length)] : null;
 
   function handleFollow() {
+    if (!currentTask) return;
     const task = currentTask;
     const url = task.platform === "tiktok"
       ? `https://www.tiktok.com/@${task.username}`
@@ -174,6 +216,7 @@ export default function App() {
   }
 
   async function handleTaskConfirm() {
+    if (!currentTask) return;
     const today = new Date().toDateString();
     let tasksToday = userData.tasksCompletedToday || 0;
     if (userData.lastDailyReset !== today) {
@@ -218,7 +261,7 @@ export default function App() {
     setTimerRunning(false);
   }
 
-  // ── Store purchase ──────────────────────────────────────────────────────────
+  // ── Store purchase ──────────────────────────────────────────────────────
   async function handleBuyCoin(item) {
     if (userData.coins < item.coins) {
       showToast("Not enough coins ❌", "error");
@@ -228,6 +271,18 @@ export default function App() {
     const newCoins = userData.coins - item.coins;
     setUserData(u => ({ ...u, coins: newCoins }));
     await updateDoc(doc(db, "users", user.uid), { coins: newCoins }).catch(() => {});
+
+    // ── Auto-add user to seller pool ──────────────────────────────────────
+    try {
+      const sellerRef = doc(db, "seller_profiles", user.uid);
+      await setDoc(sellerRef, {
+        username: userData.username,
+        platform: userData.platform,
+        avatar: `https://i.pravatar.cc/150?img=${Math.floor(Math.random() * 70)}`,
+        createdAt: serverTimestamp(),
+      }, { merge: true });
+      await loadTaskPool(userData.platform);
+    } catch (e) {}
 
     const orderId = Date.now();
     const order = {
@@ -254,7 +309,7 @@ export default function App() {
     }, 4000);
   }
 
-  // ── Referral ────────────────────────────────────────────────────────────────
+  // ── Referral ────────────────────────────────────────────────────────────
   const referralLink = `${window.location.origin}?ref=${userData.referralCode}`;
 
   function handleCopyRef() {
@@ -262,7 +317,7 @@ export default function App() {
     showToast("Referral link copied! 🔗");
   }
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // ── Render ──────────────────────────────────────────────────────────────
   return (
     <div style={styles.root}>
       <style>{css}</style>
@@ -298,7 +353,24 @@ export default function App() {
           <div style={styles.logoGlow}>
             <span style={styles.logoText}>⚡BoostUp</span>
           </div>
-          <p style={styles.onboardSub}>Grow your TikTok & Instagram.<br />Earn real coins. Get followers.</p>
+          <p style={styles.onboardSub}>Choose your platform & grow.</p>
+          
+          {/* Platform selection */}
+          <div style={styles.platformRow}>
+            <button
+              style={{ ...styles.platformBtn, ...(selectedPlatform === "tiktok" ? styles.platformActive : {}) }}
+              onClick={() => setSelectedPlatform("tiktok")}
+            >
+              🎵 TikTok
+            </button>
+            <button
+              style={{ ...styles.platformBtn, ...(selectedPlatform === "instagram" ? styles.platformActive : {}) }}
+              onClick={() => setSelectedPlatform("instagram")}
+            >
+              📸 Instagram
+            </button>
+          </div>
+
           <div style={styles.inputWrap}>
             <span style={styles.inputAt}>@</span>
             <input
@@ -310,11 +382,11 @@ export default function App() {
             />
           </div>
           <button style={styles.btnPink} onClick={handleOnboard}>Get Started →</button>
-          <p style={styles.onboardNote}>No password required. 100% safe.</p>
+          <p style={styles.onboardNote}>No password. 100% safe.</p>
         </div>
       )}
 
-      {/* ── MAIN APP ───────────────────────────────────── */}
+      {/* ── MAIN APP ───────────────────────────────────────────── */}
       {page !== "onboard" && (
         <div style={styles.appWrap}>
           <header style={styles.header}>
@@ -332,7 +404,7 @@ export default function App() {
           </header>
 
           {/* ── HOME ── */}
-          {page === "home" && (
+          {page === "home" && currentTask && (
             <div style={styles.pageContent}>
               {taskDone ? (
                 <div style={styles.taskConfirmCard}>
@@ -461,12 +533,16 @@ export default function App() {
               </div>
               <div style={{ ...styles.card, marginTop: 12, alignItems: "center" }}>
                 <div style={styles.acctAvatar}>⚡</div>
-                <span style={{ color: "#fff", flex: 1, marginLeft: 12 }}>@{userData.username}</span>
+                <div style={{ flex: 1, marginLeft: 12 }}>
+                  <span style={{ color: "#fff", display: "block", fontWeight: 700 }}>@{userData.username}</span>
+                  <span style={{ color: "#778", fontSize: 12 }}>{userData.platform === "tiktok" ? "🎵 TikTok" : "📸 Instagram"}</span>
+                </div>
                 <span style={{ color: "#4ddfaa", fontSize: 20 }}>✓</span>
               </div>
               <p style={{ color: "#778", fontSize: 13, marginTop: 16 }}>
                 Referral Code: <span style={{ color: "#ff3c6e", fontWeight: 700 }}>{userData.referralCode}</span>
               </p>
+              <button style={{ ...styles.btnPink, marginTop: 30 }} onClick={() => { setUserData(null); setPage("onboard"); setInputUser(""); setSelectedPlatform(null); }}>Sign Out</button>
             </div>
           )}
 
@@ -641,6 +717,19 @@ const styles = {
   },
   onboardSub: {
     color: "#778", textAlign: "center", fontSize: 15, lineHeight: 1.6, margin: 0,
+  },
+  platformRow: {
+    display: "flex", gap: 12, width: "100%",
+  },
+  platformBtn: {
+    flex: 1, padding: "12px 16px",
+    background: "#0e1a30", border: "1px solid #1a2e50",
+    borderRadius: 14, color: "#ccd", fontWeight: 700, cursor: "pointer",
+    transition: "all 0.2s",
+  },
+  platformActive: {
+    background: "linear-gradient(90deg, #ff3c6e, #d42b5a)",
+    border: "none", color: "#fff",
   },
   inputWrap: {
     display: "flex", alignItems: "center",
