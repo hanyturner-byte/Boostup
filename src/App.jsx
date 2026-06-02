@@ -93,6 +93,7 @@ export default function App() {
           setUserData(snap.data());
           setPage("home");
         } else {
+          setUserData({ coins: 0, orders: [], referrals: [] });
           setPage("onboard");
         }
       } else {
