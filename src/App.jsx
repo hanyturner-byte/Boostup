@@ -8,15 +8,8 @@ import {
   getDoc,
   updateDoc,
   increment,
-  query,
-  where,
-  collection,
-  getDocs,
   serverTimestamp,
 } from "firebase/firestore";
-import { loadStripe } from '@stripe/stripe-js';
-;
-
 
 // ── Firebase Config ──────────────────────────────────────────────────────────
 const firebaseConfig = {
@@ -31,7 +24,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
 // ── Task pool ────────────────────────────────────────────────────────────────
 const TASK_POOL = [
@@ -86,7 +78,6 @@ export default function App() {
   const [timer, setTimer] = useState(30);
   const [timerRunning, setTimerRunning] = useState(false);
   const [toast, setToast] = useState(null);
-  const [purchaseModal, setPurchaseModal] = useState(null);
   const [coinAnim, setCoinAnim] = useState(false);
   const toastRef = useRef(null);
   const timerRef = useRef(null);
@@ -182,7 +173,6 @@ export default function App() {
   }
 
   async function handleTaskConfirm() {
-    // Check daily cap
     const today = new Date().toDateString();
     let tasksToday = userData.tasksCompletedToday || 0;
     if (userData.lastDailyReset !== today) {
@@ -220,7 +210,7 @@ export default function App() {
     setTimerRunning(false);
   }
 
-  async function handleReport(reason) {
+  async function handleReport() {
     setReportOpen(false);
     showToast("Report submitted ✓");
     setTaskDone(false);
@@ -255,7 +245,6 @@ export default function App() {
 
     showToast(`Order placed! ${item.label} ✅`);
 
-    // Simulate completion
     setTimeout(() => {
       setUserData(u => ({
         ...u,
@@ -297,7 +286,7 @@ export default function App() {
                 <span style={{ color: "#ccd", fontSize: 14 }}>{r}</span>
               </div>
             ))}
-            <button style={{ ...styles.btnPink, marginTop: 20 }} onClick={() => reportReason && handleReport(reportReason)}>SUBMIT</button>
+            <button style={{ ...styles.btnPink, marginTop: 20 }} onClick={() => reportReason && handleReport()}>SUBMIT</button>
           </div>
         </div>
       )}
