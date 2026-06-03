@@ -174,12 +174,7 @@ export default function App() {
     toastRef.current = setTimeout(() => setToast(null), 2800);
   }
 
-  function addCoins(amount) {
-    setCoinAnim(true);
-    setTimeout(() => setCoinAnim(false), 700);
-    setUserData(u => ({ ...u, coins: u.coins + amount }));
-    updateDoc(doc(db, "users", user.uid), { coins: increment(amount) }).catch(() => {});
-  }
+
 
   // ── Onboarding ──────────────────────────────────────────────────────────
   async function handleOnboard() {
