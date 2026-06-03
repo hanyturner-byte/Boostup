@@ -87,7 +87,6 @@ export default function App() {
   const [timer, setTimer] = useState(30);
   const [timerRunning, setTimerRunning] = useState(false);
   const [toast, setToast] = useState(null);
-  const [coinAnim, setCoinAnim] = useState(false);
   const [taskPool, setTaskPool] = useState([]);
   const toastRef = useRef(null);
   const timerRef = useRef(null);
@@ -535,7 +534,7 @@ export default function App() {
             <span style={styles.headerTitle}>
               {page === "home" ? "BoostUp" : page === "store" ? "Store" : page === "more" ? "Settings" : page === "orders" ? "Orders" : page === "manageAccount" ? "Account" : page === "admin" ? "Admin" : "More"}
             </span>
-            <div style={{ ...styles.coinBadge, ...(coinAnim ? styles.coinBounce : {}) }}>
+            <div style={styles.coinBadge}>
               ⭐ {userData.coins}
             </div>
           </header>
@@ -846,7 +845,6 @@ const styles = {
   acctAvatar: { width: 40, height: 40, borderRadius: "50%", background: "linear-gradient(135deg, #ff3c6e, #5b8dff)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 },
   headerTitle: { color: "#fff", fontWeight: 800, fontSize: 18, letterSpacing: 0.5 },
   coinBadge: { background: "#1a2540", borderRadius: 20, padding: "6px 12px", color: "#ffd700", fontWeight: 800, fontSize: 15 },
-  coinBounce: { transform: "scale(1.3)" },
   backBtn: { background: "none", border: "none", color: "#fff", fontSize: 28, cursor: "pointer", padding: "0 8px" },
   pageContent: { flex: 1, overflowY: "auto", padding: "16px", paddingBottom: 80 },
   bottomNav: { position: "sticky", bottom: 0, display: "flex", background: "#0a1428", borderTop: "1px solid #0e1e35", padding: "8px 0 4px" },
