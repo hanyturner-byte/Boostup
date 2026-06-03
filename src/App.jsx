@@ -110,10 +110,18 @@ export default function App() {
         const userRef = doc(db, "users", fbUser.uid);
         const snap = await getDoc(userRef);
         
-        // Check if admin
-        const adminRef = doc(db, "admins", fbUser.uid);
-        const adminSnap = await getDoc(adminRef);
-        setIsAdmin(adminSnap.exists());
+        // Check if admin - verify document exists
+        try {
+          const adminRef = doc(db, "admins", fbUser.uid);
+          const adminSnap = await getDoc(adminRef);
+          if (adminSnap.exists()) {
+            setIsAdmin(true);
+          } else {
+            setIsAdmin(false);
+          }
+        } catch (e) {
+          setIsAdmin(false);
+        }
 
         if (snap.exists()) {
           const data = snap.data();
