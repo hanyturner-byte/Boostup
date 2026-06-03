@@ -110,29 +110,14 @@ export default function App() {
         const userRef = doc(db, "users", fbUser.uid);
         const snap = await getDoc(userRef);
         
-        // Check if admin - with retry logic
-        const checkAdmin = async () => {
-          for (let i = 0; i < 3; i++) {
-            try {
-              const adminRef = doc(db, "admins", fbUser.uid);
-              const adminSnap = await getDoc(adminRef);
-              console.log(`Admin check attempt ${i + 1} - UID:`, fbUser.uid);
-              console.log("Admin doc exists:", adminSnap.exists());
-              if (adminSnap.exists()) {
-                console.log("✅ User is ADMIN");
-                return true;
-              }
-              break;
-            } catch (e) {
-              console.log(`Admin check error (attempt ${i + 1}):`, e);
-              if (i < 2) await new Promise(resolve => setTimeout(resolve, 500));
-            }
-          }
-          console.log("❌ User is NOT admin");
-          return false;
-        };
-        const isAdminUser = await checkAdmin();
-        setIsAdmin(isAdminUser);
+        // Check if admin - simple check
+        try {
+          const adminDoc = await getDoc(doc(db, "admins", fbUser.uid));
+          setIsAdmin(adminDoc.exists());
+        } catch (e) {
+          console.error("Admin check failed:", e);
+          setIsAdmin(false);
+        }
 
         if (snap.exists()) {
           const data = snap.data();
